@@ -44,7 +44,15 @@
       "Bash(cp -r /tmp/git-portable/node_modules/dugite/git ~/local/git)",
       "Bash(export PATH=\"$HOME/local/git/bin:$PATH\")",
       "Bash(~/local/git/bin/git --version)",
-      "Bash(export PATH=\"$HOME/local/node/bin:$HOME/local/gh/bin:$HOME/local/git/bin:$PATH\")"
+      "Bash(export PATH=\"$HOME/local/node/bin:$HOME/local/gh/bin:$HOME/local/git/bin:$PATH\")",
+      "Bash(gh repo *)",
+      "Bash(env)",
+      "Bash(export GIT_EXEC_PATH=\"$HOME/local/git/libexec/git-core\")",
+      "Bash(git --exec-path)",
+      "Bash(git push *)",
+      "Bash(vercel --version)",
+      "Bash(vercel whoami *)",
+      "Bash(vercel deploy *)"
     ]
   }
 }
