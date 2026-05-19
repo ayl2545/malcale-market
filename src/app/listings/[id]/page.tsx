@@ -1,4 +1,3 @@
-import { notFound } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
 import {
@@ -17,6 +16,10 @@ import {
 } from "@/lib/format";
 import { ImageGallery } from "@/components/ImageGallery";
 import { ListingCard } from "@/components/ListingCard";
+import { DeliveryBadge } from "@/components/DeliveryBadge";
+import { UserListingDetail } from "@/components/UserListingDetail";
+
+export const dynamicParams = true;
 
 export async function generateStaticParams() {
   return listings.map((l) => ({ id: l.id }));
@@ -29,9 +32,15 @@ export default async function ListingPage({
 }) {
   const { id } = await params;
   const listing = getListing(id);
-  if (!listing) notFound();
+
+  if (!listing) {
+    return <UserListingDetail id={id} />;
+  }
+
   const seller = getUser(listing.sellerId);
-  if (!seller) notFound();
+  if (!seller) {
+    return <UserListingDetail id={id} />;
+  }
 
   const more = listingsBySeller(seller.id).filter((l) => l.id !== listing.id);
 
@@ -70,6 +79,12 @@ export default async function ListingPage({
             <p className="mt-1 text-sm text-[color:var(--muted-foreground)]">
               You pay {formatPrice(buyerTotal(listing.price))} including buyer protection.
             </p>
+
+            <DeliveryBadge
+              delivery={listing.delivery}
+              pickupLocation={listing.pickupLocation}
+            />
+
             <div className="mt-4 flex flex-col sm:flex-row gap-2">
               <Link
                 href={`/checkout/${listing.id}`}

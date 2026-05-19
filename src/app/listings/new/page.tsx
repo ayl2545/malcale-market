@@ -1,10 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { sellerPayout, formatPrice } from "@/lib/format";
+import { addUserListing, readPayoutSetup } from "@/lib/local-state";
+import type { Category, Condition, Delivery } from "@/lib/types";
 
-const CATEGORIES = [
+const CATEGORIES: { value: Category; label: string }[] = [
   { value: "women", label: "Women" },
   { value: "men", label: "Men" },
   { value: "kids", label: "Kids" },
@@ -14,32 +17,84 @@ const CATEGORIES = [
   { value: "home", label: "Home" },
 ];
 
-const CONDITIONS = [
+const CONDITIONS: { value: Condition; label: string; desc: string }[] = [
   { value: "new", label: "New with tags", desc: "Unworn, original tags attached" },
   { value: "like_new", label: "Like new", desc: "Worn once or twice, no flaws" },
   { value: "good", label: "Good condition", desc: "Light, normal signs of wear" },
   { value: "used", label: "Used", desc: "Visible wear, still wearable" },
 ];
 
+const DELIVERY_OPTIONS: { value: Delivery; label: string; desc: string; icon: string }[] = [
+  {
+    value: "ship",
+    label: "Home delivery",
+    desc: "Buyer pays shipping; you ship the item.",
+    icon: "📦",
+  },
+  {
+    value: "pickup",
+    label: "Local pickup",
+    desc: "Buyer collects from a meeting point you choose.",
+    icon: "🤝",
+  },
+  {
+    value: "both",
+    label: "Both",
+    desc: "Buyer chooses at checkout.",
+    icon: "🚚",
+  },
+];
+
+type Errors = Partial<{
+  title: string;
+  description: string;
+  price: string;
+  category: string;
+  condition: string;
+  delivery: string;
+  pickup: string;
+  images: string;
+}>;
+
 export default function NewListingPage() {
   const router = useRouter();
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [priceUsd, setPriceUsd] = useState("");
-  const [category, setCategory] = useState("");
-  const [condition, setCondition] = useState("");
+  const [category, setCategory] = useState<Category | "">("");
+  const [condition, setCondition] = useState<Condition | "">("");
   const [brand, setBrand] = useState("");
   const [size, setSize] = useState("");
+  const [delivery, setDelivery] = useState<Delivery | "">("");
+  const [pickupLocation, setPickupLocation] = useState("");
   const [images, setImages] = useState<string[]>([]);
+  const [errors, setErrors] = useState<Errors>({});
+  const [touched, setTouched] = useState(false);
   const [submitted, setSubmitted] = useState(false);
+  const [payoutOk, setPayoutOk] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    setPayoutOk(readPayoutSetup().status === "verified");
+  }, []);
 
   const priceCents = Math.round((Number(priceUsd) || 0) * 100);
-  const valid =
-    title.length >= 3 &&
-    description.length >= 10 &&
-    priceCents > 0 &&
-    category &&
-    condition;
+
+  const validate = (): Errors => {
+    const e: Errors = {};
+    if (title.trim().length < 3) e.title = "Add a title (at least 3 characters).";
+    if (description.trim().length < 10)
+      e.description = "Describe the item in at least 10 characters.";
+    if (priceCents <= 0) e.price = "Set a price greater than $0.";
+    if (!category) e.category = "Pick a category.";
+    if (!condition) e.condition = "Choose the condition.";
+    if (!delivery) e.delivery = "Choose how the buyer will receive the item.";
+    if ((delivery === "pickup" || delivery === "both") && pickupLocation.trim().length < 2) {
+      e.pickup = "Add a pickup city or area.";
+    }
+    return e;
+  };
+
+  const liveErrors = touched ? validate() : {};
 
   const handleImagePick = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files ?? []);
@@ -53,17 +108,43 @@ export default function NewListingPage() {
 
   const onSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    setTouched(true);
+    const e2 = validate();
+    setErrors(e2);
+    if (Object.keys(e2).length > 0) {
+      const firstError = document.querySelector("[data-error]");
+      firstError?.scrollIntoView({ behavior: "smooth", block: "center" });
+      return;
+    }
+    if (!payoutOk) {
+      router.push("/settings/payouts?return=/listings/new");
+      return;
+    }
+    addUserListing({
+      title: title.trim(),
+      description: description.trim(),
+      price: priceCents,
+      category: category as Category,
+      condition: condition as Condition,
+      brand: brand.trim(),
+      size: size.trim(),
+      images,
+      delivery: delivery as Delivery,
+      pickupLocation: pickupLocation.trim() || undefined,
+    });
     setSubmitted(true);
-    setTimeout(() => router.push("/"), 1500);
+    setTimeout(() => router.push("/?published=1"), 1200);
   };
 
   if (submitted) {
     return (
       <div className="mx-auto max-w-md px-4 py-20 text-center">
-        <div className="text-5xl mb-4">🎉</div>
-        <h1 className="text-2xl font-bold">Listing published!</h1>
+        <div className="mx-auto h-16 w-16 rounded-full bg-[color:var(--primary)]/10 grid place-items-center text-3xl">
+          ✓
+        </div>
+        <h1 className="text-2xl font-bold mt-4">Listing published!</h1>
         <p className="mt-2 text-[color:var(--muted-foreground)]">
-          (Demo: nothing was actually saved.) Redirecting you home…
+          Taking you to the home feed where you can see it…
         </p>
       </div>
     );
@@ -76,11 +157,26 @@ export default function NewListingPage() {
         Most items get their first message within 24 hours.
       </p>
 
-      <form onSubmit={onSubmit} className="mt-8 space-y-6">
+      {payoutOk === false && (
+        <div className="mt-6 p-4 rounded-2xl border border-yellow-300 bg-yellow-50 text-sm">
+          <p className="font-semibold text-yellow-900">Set up payouts before you can publish</p>
+          <p className="mt-1 text-yellow-800">
+            You&apos;ll need to tell us where to send the money when your item sells.
+          </p>
+          <Link
+            href="/settings/payouts?return=/listings/new"
+            className="inline-flex items-center mt-2 h-9 px-4 rounded-full bg-yellow-900 text-white text-sm font-semibold"
+          >
+            Set up payouts →
+          </Link>
+        </div>
+      )}
+
+      <form onSubmit={onSubmit} className="mt-8 space-y-6" noValidate>
         <section className="space-y-2">
           <label className="font-semibold">Photos</label>
           <p className="text-sm text-[color:var(--muted-foreground)]">
-            First photo is the cover. Add up to 6.
+            First photo is the cover. Add up to 6. (Optional — a placeholder will be used.)
           </p>
           <div className="grid grid-cols-3 sm:grid-cols-4 gap-3">
             {images.map((src, i) => (
@@ -88,7 +184,7 @@ export default function NewListingPage() {
                 key={src}
                 className="relative aspect-square rounded-xl overflow-hidden bg-[color:var(--muted)] border"
               >
-                {}
+                {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
                   src={src}
                   alt={`Upload ${i + 1}`}
@@ -127,36 +223,53 @@ export default function NewListingPage() {
           </div>
         </section>
 
-        <Field label="Title" hint="What is it?">
+        <Field
+          label="Title"
+          hint="What is it?"
+          error={liveErrors.title}
+        >
           <input
             value={title}
             onChange={(e) => setTitle(e.target.value)}
-            placeholder="e.g. Vintage Levi's 501 jeans"
+            placeholder="e.g. Long-sleeve maxi dress"
             maxLength={80}
-            className="w-full h-11 px-4 rounded-lg border bg-white"
+            className={inputCls(liveErrors.title)}
+            data-error={liveErrors.title ? "true" : undefined}
           />
         </Field>
 
-        <Field label="Description" hint="Condition details, fit, measurements, anything a buyer should know.">
+        <Field
+          label="Description"
+          hint="Condition details, fit, measurements, anything a buyer should know."
+          error={liveErrors.description}
+        >
           <textarea
             value={description}
             onChange={(e) => setDescription(e.target.value)}
             placeholder="Be honest — the best listings mention any flaws."
             rows={4}
-            className="w-full p-3 rounded-lg border bg-white resize-y"
+            className={`w-full p-3 rounded-lg border bg-white resize-y ${
+              liveErrors.description ? "border-red-500" : ""
+            }`}
+            data-error={liveErrors.description ? "true" : undefined}
           />
         </Field>
 
         <div className="grid sm:grid-cols-2 gap-4">
-          <Field label="Category">
+          <Field label="Category" error={liveErrors.category}>
             <select
               value={category}
-              onChange={(e) => setCategory(e.target.value)}
-              className="w-full h-11 px-3 rounded-lg border bg-white"
+              onChange={(e) => setCategory(e.target.value as Category)}
+              className={`w-full h-11 px-3 rounded-lg border bg-white ${
+                liveErrors.category ? "border-red-500" : ""
+              }`}
+              data-error={liveErrors.category ? "true" : undefined}
             >
               <option value="">Select…</option>
               {CATEGORIES.map((c) => (
-                <option key={c.value} value={c.value}>{c.label}</option>
+                <option key={c.value} value={c.value}>
+                  {c.label}
+                </option>
               ))}
             </select>
           </Field>
@@ -165,7 +278,7 @@ export default function NewListingPage() {
               value={brand}
               onChange={(e) => setBrand(e.target.value)}
               placeholder="Optional"
-              className="w-full h-11 px-4 rounded-lg border bg-white"
+              className={inputCls()}
             />
           </Field>
           <Field label="Size">
@@ -173,12 +286,14 @@ export default function NewListingPage() {
               value={size}
               onChange={(e) => setSize(e.target.value)}
               placeholder="e.g. M, W27, EU 38"
-              className="w-full h-11 px-4 rounded-lg border bg-white"
+              className={inputCls()}
             />
           </Field>
-          <Field label="Price (USD)">
+          <Field label="Price (USD)" error={liveErrors.price}>
             <div className="relative">
-              <span className="absolute left-4 top-1/2 -translate-y-1/2 text-[color:var(--muted-foreground)]">$</span>
+              <span className="absolute left-4 top-1/2 -translate-y-1/2 text-[color:var(--muted-foreground)]">
+                $
+              </span>
               <input
                 type="number"
                 inputMode="decimal"
@@ -187,13 +302,16 @@ export default function NewListingPage() {
                 value={priceUsd}
                 onChange={(e) => setPriceUsd(e.target.value)}
                 placeholder="0.00"
-                className="w-full h-11 pl-8 pr-4 rounded-lg border bg-white"
+                className={`w-full h-11 pl-8 pr-4 rounded-lg border bg-white ${
+                  liveErrors.price ? "border-red-500" : ""
+                }`}
+                data-error={liveErrors.price ? "true" : undefined}
               />
             </div>
           </Field>
         </div>
 
-        <section className="space-y-2">
+        <section className="space-y-2" data-error={liveErrors.condition ? "true" : undefined}>
           <label className="font-semibold">Condition</label>
           <div className="grid sm:grid-cols-2 gap-2">
             {CONDITIONS.map((c) => (
@@ -210,7 +328,7 @@ export default function NewListingPage() {
                   name="condition"
                   value={c.value}
                   checked={condition === c.value}
-                  onChange={(e) => setCondition(e.target.value)}
+                  onChange={(e) => setCondition(e.target.value as Condition)}
                   className="mt-1"
                 />
                 <div>
@@ -220,6 +338,56 @@ export default function NewListingPage() {
               </label>
             ))}
           </div>
+          {liveErrors.condition && (
+            <p className="text-xs text-red-600 mt-1">{liveErrors.condition}</p>
+          )}
+        </section>
+
+        <section className="space-y-2" data-error={liveErrors.delivery ? "true" : undefined}>
+          <label className="font-semibold">How will the buyer receive it?</label>
+          <div className="grid sm:grid-cols-3 gap-2">
+            {DELIVERY_OPTIONS.map((o) => (
+              <label
+                key={o.value}
+                className={`flex flex-col gap-1 p-3 rounded-lg border cursor-pointer ${
+                  delivery === o.value
+                    ? "border-[color:var(--primary)] bg-[color:var(--primary)]/5"
+                    : "hover:bg-[color:var(--muted)]"
+                }`}
+              >
+                <div className="flex items-center gap-2">
+                  <input
+                    type="radio"
+                    name="delivery"
+                    value={o.value}
+                    checked={delivery === o.value}
+                    onChange={(e) => setDelivery(e.target.value as Delivery)}
+                  />
+                  <span className="text-base">{o.icon}</span>
+                  <span className="font-medium text-sm">{o.label}</span>
+                </div>
+                <p className="text-xs text-[color:var(--muted-foreground)] ml-6">{o.desc}</p>
+              </label>
+            ))}
+          </div>
+          {liveErrors.delivery && (
+            <p className="text-xs text-red-600 mt-1">{liveErrors.delivery}</p>
+          )}
+          {(delivery === "pickup" || delivery === "both") && (
+            <Field
+              label="Pickup city / area"
+              hint="Buyers see this on the listing so they know where to meet you."
+              error={liveErrors.pickup}
+            >
+              <input
+                value={pickupLocation}
+                onChange={(e) => setPickupLocation(e.target.value)}
+                placeholder="e.g. Tel Aviv, Florentin area"
+                className={inputCls(liveErrors.pickup)}
+                data-error={liveErrors.pickup ? "true" : undefined}
+              />
+            </Field>
+          )}
         </section>
 
         {priceCents > 0 && (
@@ -239,6 +407,12 @@ export default function NewListingPage() {
           </div>
         )}
 
+        {touched && Object.keys(errors).length > 0 && (
+          <div className="p-3 rounded-lg bg-red-50 border border-red-200 text-sm text-red-700">
+            Please fix the highlighted fields above.
+          </div>
+        )}
+
         <div className="flex gap-3 pt-2">
           <button
             type="button"
@@ -249,10 +423,9 @@ export default function NewListingPage() {
           </button>
           <button
             type="submit"
-            disabled={!valid}
-            className="flex-1 h-12 rounded-full bg-[color:var(--primary)] text-[color:var(--primary-foreground)] font-semibold disabled:opacity-50 disabled:cursor-not-allowed hover:opacity-90"
+            className="flex-1 h-12 rounded-full bg-[color:var(--primary)] text-[color:var(--primary-foreground)] font-semibold hover:opacity-90"
           >
-            Publish listing
+            {payoutOk ? "Publish listing" : "Set up payouts to publish"}
           </button>
         </div>
       </form>
@@ -260,13 +433,19 @@ export default function NewListingPage() {
   );
 }
 
+function inputCls(error?: string) {
+  return `w-full h-11 px-4 rounded-lg border bg-white ${error ? "border-red-500" : ""}`;
+}
+
 function Field({
   label,
   hint,
+  error,
   children,
 }: {
   label: string;
   hint?: string;
+  error?: string;
   children: React.ReactNode;
 }) {
   return (
@@ -274,6 +453,7 @@ function Field({
       <label className="font-semibold text-sm block">{label}</label>
       {hint && <p className="text-xs text-[color:var(--muted-foreground)]">{hint}</p>}
       {children}
+      {error && <p className="text-xs text-red-600">{error}</p>}
     </div>
   );
 }

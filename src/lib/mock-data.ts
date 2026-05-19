@@ -108,6 +108,8 @@ export const listings: Listing[] = [
     status: "active",
     createdAt: "2026-05-14T10:12:00Z",
     likes: 38,
+    delivery: "both",
+    pickupLocation: "Brooklyn, NY",
   },
   {
     id: "l_002",
@@ -127,6 +129,7 @@ export const listings: Listing[] = [
     status: "active",
     createdAt: "2026-05-15T08:30:00Z",
     likes: 92,
+    delivery: "ship",
   },
   {
     id: "l_003",
@@ -146,6 +149,7 @@ export const listings: Listing[] = [
     status: "active",
     createdAt: "2026-05-16T14:45:00Z",
     likes: 51,
+    delivery: "ship",
   },
   {
     id: "l_004",
@@ -165,6 +169,8 @@ export const listings: Listing[] = [
     status: "active",
     createdAt: "2026-05-10T17:20:00Z",
     likes: 124,
+    delivery: "both",
+    pickupLocation: "Brooklyn, NY",
   },
   {
     id: "l_005",
@@ -181,6 +187,8 @@ export const listings: Listing[] = [
     status: "active",
     createdAt: "2026-05-17T09:00:00Z",
     likes: 9,
+    delivery: "pickup",
+    pickupLocation: "Tel Aviv, IL",
   },
   {
     id: "l_006",
@@ -197,6 +205,7 @@ export const listings: Listing[] = [
     status: "active",
     createdAt: "2026-05-13T11:00:00Z",
     likes: 67,
+    delivery: "ship",
   },
   {
     id: "l_007",
@@ -213,6 +222,7 @@ export const listings: Listing[] = [
     status: "active",
     createdAt: "2026-05-16T19:30:00Z",
     likes: 73,
+    delivery: "ship",
   },
   {
     id: "l_008",
@@ -232,6 +242,8 @@ export const listings: Listing[] = [
     status: "active",
     createdAt: "2026-05-12T16:00:00Z",
     likes: 88,
+    delivery: "both",
+    pickupLocation: "Brooklyn, NY",
   },
   {
     id: "l_009",
@@ -251,6 +263,7 @@ export const listings: Listing[] = [
     status: "active",
     createdAt: "2026-05-09T13:00:00Z",
     likes: 156,
+    delivery: "ship",
   },
   {
     id: "l_010",
@@ -267,6 +280,8 @@ export const listings: Listing[] = [
     status: "active",
     createdAt: "2026-05-15T07:15:00Z",
     likes: 4,
+    delivery: "pickup",
+    pickupLocation: "Tel Aviv, IL",
   },
   {
     id: "l_011",
@@ -283,6 +298,7 @@ export const listings: Listing[] = [
     status: "active",
     createdAt: "2026-05-11T10:00:00Z",
     likes: 41,
+    delivery: "ship",
   },
   {
     id: "l_012",
@@ -299,6 +315,7 @@ export const listings: Listing[] = [
     status: "active",
     createdAt: "2026-05-17T15:45:00Z",
     likes: 22,
+    delivery: "ship",
   },
   {
     id: "l_013",
@@ -318,6 +335,8 @@ export const listings: Listing[] = [
     status: "active",
     createdAt: "2026-05-18T09:20:00Z",
     likes: 33,
+    delivery: "both",
+    pickupLocation: "Jerusalem, IL",
   },
   {
     id: "l_014",
@@ -337,6 +356,8 @@ export const listings: Listing[] = [
     status: "active",
     createdAt: "2026-05-17T11:00:00Z",
     likes: 47,
+    delivery: "both",
+    pickupLocation: "Brooklyn, NY",
   },
   {
     id: "l_015",
@@ -353,6 +374,7 @@ export const listings: Listing[] = [
     status: "active",
     createdAt: "2026-05-16T08:00:00Z",
     likes: 28,
+    delivery: "ship",
   },
 ];
 

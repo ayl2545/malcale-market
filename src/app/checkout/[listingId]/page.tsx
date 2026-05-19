@@ -26,6 +26,8 @@ export default async function CheckoutPage({
         size: listing.size,
         price: listing.price,
         image: listing.images[0],
+        delivery: listing.delivery,
+        pickupLocation: listing.pickupLocation,
       }}
       seller={{ displayName: seller.displayName, username: seller.username }}
     />

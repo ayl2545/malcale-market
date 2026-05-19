@@ -28,6 +28,7 @@ export function Footer() {
           <h4 className="font-semibold mb-3">Selling</h4>
           <ul className="space-y-2 text-[color:var(--muted-foreground)]">
             <li><Link href="/listings/new" className="hover:text-[color:var(--foreground)]">List an item</Link></li>
+            <li><Link href="/settings/payouts" className="hover:text-[color:var(--foreground)]">Payout settings</Link></li>
             <li><Link href="/orders" className="hover:text-[color:var(--foreground)]">My orders</Link></li>
             <li><span>Seller fees: 5%</span></li>
           </ul>

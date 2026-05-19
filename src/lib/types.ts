@@ -21,6 +21,8 @@ export type User = {
   location: string;
 };
 
+export type Delivery = "ship" | "pickup" | "both";
+
 export type Listing = {
   id: string;
   sellerId: string;
@@ -35,6 +37,8 @@ export type Listing = {
   status: "active" | "sold";
   createdAt: string;
   likes: number;
+  delivery: Delivery;
+  pickupLocation?: string;
 };
 
 export type Message = {

@@ -1,5 +1,7 @@
+import { Suspense } from "react";
 import { ListingCard } from "@/components/ListingCard";
 import { FilterBar } from "@/components/FilterBar";
+import { YourListings } from "@/components/YourListings";
 import { listings } from "@/lib/mock-data";
 import type { Listing } from "@/lib/types";
 import Link from "next/link";
@@ -107,6 +109,10 @@ export default async function Home({
           </div>
         </section>
       )}
+
+      <Suspense fallback={null}>
+        <YourListings />
+      </Suspense>
 
       <section className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-8">
         <div className="flex items-center justify-between gap-4 mb-4">

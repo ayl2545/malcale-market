@@ -5,6 +5,7 @@ import {
   getUserByUsername,
   listingsBySeller,
   users,
+  CURRENT_USER_ID,
 } from "@/lib/mock-data";
 import { ListingCard } from "@/components/ListingCard";
 
@@ -53,18 +54,29 @@ export default async function ProfilePage({
           )}
         </div>
         <div className="flex gap-2">
-          <Link
-            href={`/inbox?to=${user.id}`}
-            className="h-10 px-5 rounded-full border font-semibold text-sm hover:bg-[color:var(--muted)]"
-          >
-            Message
-          </Link>
-          <button
-            type="button"
-            className="h-10 px-5 rounded-full bg-[color:var(--primary)] text-[color:var(--primary-foreground)] font-semibold text-sm hover:opacity-90"
-          >
-            Follow
-          </button>
+          {user.id === CURRENT_USER_ID ? (
+            <Link
+              href="/settings/payouts"
+              className="h-10 px-5 rounded-full bg-[color:var(--primary)] text-[color:var(--primary-foreground)] font-semibold text-sm hover:opacity-90"
+            >
+              Payout settings
+            </Link>
+          ) : (
+            <>
+              <Link
+                href={`/inbox?to=${user.id}`}
+                className="h-10 px-5 rounded-full border font-semibold text-sm hover:bg-[color:var(--muted)]"
+              >
+                Message
+              </Link>
+              <button
+                type="button"
+                className="h-10 px-5 rounded-full bg-[color:var(--primary)] text-[color:var(--primary-foreground)] font-semibold text-sm hover:opacity-90"
+              >
+                Follow
+              </button>
+            </>
+          )}
         </div>
       </header>
 
