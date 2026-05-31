@@ -1,17 +1,9 @@
 import { notFound } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
-import {
-  getUserByUsername,
-  listingsBySeller,
-  users,
-  CURRENT_USER_ID,
-} from "@/lib/mock-data";
+import { getProfileWithListings } from "@/lib/data";
+import { getSessionUser } from "@/lib/supabase/server";
 import { ListingCard } from "@/components/ListingCard";
-
-export async function generateStaticParams() {
-  return users.map((u) => ({ username: u.username }));
-}
 
 export default async function ProfilePage({
   params,
@@ -19,10 +11,18 @@ export default async function ProfilePage({
   params: Promise<{ username: string }>;
 }) {
   const { username } = await params;
-  const user = getUserByUsername(username);
-  if (!user) notFound();
+  const result = await getProfileWithListings(username);
+  if (!result) notFound();
+  const { user, listings: items } = result;
 
-  const items = listingsBySeller(user.id);
+  let isOwn = false;
+  try {
+    const session = await getSessionUser();
+    isOwn = session?.id === user.id;
+  } catch {
+    /* not configured yet */
+  }
+
   const active = items.filter((l) => l.status === "active");
   const sold = items.filter((l) => l.status === "sold");
 
@@ -46,15 +46,19 @@ export default async function ProfilePage({
               <span className="font-medium text-[color:var(--foreground)]">{user.rating.toFixed(2)}</span>
               <span>({user.reviewCount} reviews)</span>
             </span>
-            <span>· {user.location}</span>
-            <span>· Joined {new Date(user.joinedAt).toLocaleDateString(undefined, { month: "short", year: "numeric" })}</span>
+            {user.location && <span>· {user.location}</span>}
+            <span>
+              · Joined{" "}
+              {new Date(user.joinedAt).toLocaleDateString(undefined, {
+                month: "short",
+                year: "numeric",
+              })}
+            </span>
           </div>
-          {user.bio && (
-            <p className="mt-3 text-sm max-w-prose">{user.bio}</p>
-          )}
+          {user.bio && <p className="mt-3 text-sm max-w-prose">{user.bio}</p>}
         </div>
         <div className="flex gap-2">
-          {user.id === CURRENT_USER_ID ? (
+          {isOwn ? (
             <Link
               href="/settings/payouts"
               className="h-10 px-5 rounded-full bg-[color:var(--primary)] text-[color:var(--primary-foreground)] font-semibold text-sm hover:opacity-90"
@@ -84,13 +88,15 @@ export default async function ProfilePage({
         <Stat label="Items for sale" value={active.length} />
         <Stat label="Sold" value={sold.length} />
         <Stat label="Reviews" value={user.reviewCount} />
-        <Stat label="Rating" value={user.rating.toFixed(1)} className="hidden sm:block" />
+        <Stat
+          label="Rating"
+          value={user.rating.toFixed(1)}
+          className="hidden sm:block"
+        />
       </div>
 
       <section>
-        <h2 className="text-xl font-bold mb-4">
-          Closet ({active.length})
-        </h2>
+        <h2 className="text-xl font-bold mb-4">Closet ({active.length})</h2>
         {active.length === 0 ? (
           <p className="text-[color:var(--muted-foreground)] text-sm py-8 text-center border rounded-2xl">
             Nothing listed right now.

@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { sellerPayout, formatPrice } from "@/lib/format";
 import { addUserListing, readPayoutSetup } from "@/lib/local-state";
+import { getBrowserSupabase } from "@/lib/supabase/client";
 import type { Category, Condition, Delivery } from "@/lib/types";
 
 const CATEGORIES: { value: Category; label: string }[] = [
@@ -25,24 +26,9 @@ const CONDITIONS: { value: Condition; label: string; desc: string }[] = [
 ];
 
 const DELIVERY_OPTIONS: { value: Delivery; label: string; desc: string; icon: string }[] = [
-  {
-    value: "ship",
-    label: "Home delivery",
-    desc: "Buyer pays shipping; you ship the item.",
-    icon: "📦",
-  },
-  {
-    value: "pickup",
-    label: "Local pickup",
-    desc: "Buyer collects from a meeting point you choose.",
-    icon: "🤝",
-  },
-  {
-    value: "both",
-    label: "Both",
-    desc: "Buyer chooses at checkout.",
-    icon: "🚚",
-  },
+  { value: "ship", label: "Home delivery", desc: "Buyer pays shipping; you ship the item.", icon: "📦" },
+  { value: "pickup", label: "Local pickup", desc: "Buyer collects from a meeting point you choose.", icon: "🤝" },
+  { value: "both", label: "Both", desc: "Buyer chooses at checkout.", icon: "🚚" },
 ];
 
 type Errors = Partial<{
@@ -56,8 +42,11 @@ type Errors = Partial<{
   images: string;
 }>;
 
+type LocalFile = { file: File; previewUrl: string };
+
 export default function NewListingPage() {
   const router = useRouter();
+  const supabase = getBrowserSupabase();
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [priceUsd, setPriceUsd] = useState("");
@@ -67,23 +56,29 @@ export default function NewListingPage() {
   const [size, setSize] = useState("");
   const [delivery, setDelivery] = useState<Delivery | "">("");
   const [pickupLocation, setPickupLocation] = useState("");
-  const [images, setImages] = useState<string[]>([]);
+  const [files, setFiles] = useState<LocalFile[]>([]);
   const [errors, setErrors] = useState<Errors>({});
   const [touched, setTouched] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
   const [submitted, setSubmitted] = useState(false);
+
+  const [authState, setAuthState] = useState<"unknown" | "guest" | "user">("unknown");
   const [payoutOk, setPayoutOk] = useState<boolean | null>(null);
 
   useEffect(() => {
+    supabase.auth.getUser().then(({ data }) => {
+      setAuthState(data.user ? "user" : "guest");
+    });
     setPayoutOk(readPayoutSetup().status === "verified");
-  }, []);
+  }, [supabase]);
 
   const priceCents = Math.round((Number(priceUsd) || 0) * 100);
 
   const validate = (): Errors => {
     const e: Errors = {};
     if (title.trim().length < 3) e.title = "Add a title (at least 3 characters).";
-    if (description.trim().length < 10)
-      e.description = "Describe the item in at least 10 characters.";
+    if (description.trim().length < 10) e.description = "Describe the item in at least 10 characters.";
     if (priceCents <= 0) e.price = "Set a price greater than $0.";
     if (!category) e.category = "Pick a category.";
     if (!condition) e.condition = "Choose the condition.";
@@ -97,43 +92,108 @@ export default function NewListingPage() {
   const liveErrors = touched ? validate() : {};
 
   const handleImagePick = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = Array.from(e.target.files ?? []);
-    const urls = files.map((f) => URL.createObjectURL(f));
-    setImages((prev) => [...prev, ...urls].slice(0, 6));
+    const picked = Array.from(e.target.files ?? []);
+    const mapped: LocalFile[] = picked.map((file) => ({
+      file,
+      previewUrl: URL.createObjectURL(file),
+    }));
+    setFiles((prev) => [...prev, ...mapped].slice(0, 6));
   };
 
   const removeImage = (idx: number) => {
-    setImages((prev) => prev.filter((_, i) => i !== idx));
+    setFiles((prev) => {
+      const next = prev.slice();
+      const [removed] = next.splice(idx, 1);
+      URL.revokeObjectURL(removed.previewUrl);
+      return next;
+    });
   };
 
-  const onSubmit = (e: React.FormEvent) => {
+  const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setTouched(true);
+    setSubmitError(null);
     const e2 = validate();
     setErrors(e2);
     if (Object.keys(e2).length > 0) {
-      const firstError = document.querySelector("[data-error]");
-      firstError?.scrollIntoView({ behavior: "smooth", block: "center" });
+      document.querySelector("[data-error]")?.scrollIntoView({ behavior: "smooth", block: "center" });
       return;
     }
     if (!payoutOk) {
       router.push("/settings/payouts?return=/listings/new");
       return;
     }
-    addUserListing({
-      title: title.trim(),
-      description: description.trim(),
-      price: priceCents,
-      category: category as Category,
-      condition: condition as Condition,
-      brand: brand.trim(),
-      size: size.trim(),
-      images,
-      delivery: delivery as Delivery,
-      pickupLocation: pickupLocation.trim() || undefined,
-    });
-    setSubmitted(true);
-    setTimeout(() => router.push("/?published=1"), 1200);
+
+    setSubmitting(true);
+    try {
+      const { data: userData } = await supabase.auth.getUser();
+      const user = userData.user;
+
+      if (!user) {
+        // Guest fallback: still save to localStorage so demo works.
+        addUserListing({
+          title: title.trim(),
+          description: description.trim(),
+          price: priceCents,
+          category: category as Category,
+          condition: condition as Condition,
+          brand: brand.trim(),
+          size: size.trim(),
+          images: files.map((f) => f.previewUrl),
+          delivery: delivery as Delivery,
+          pickupLocation: pickupLocation.trim() || undefined,
+        });
+        setSubmitted(true);
+        setTimeout(() => router.push("/?published=1"), 1200);
+        return;
+      }
+
+      const { data: inserted, error: insertErr } = await supabase
+        .from("listings")
+        .insert({
+          seller_id: user.id,
+          title: title.trim(),
+          description: description.trim(),
+          price_cents: priceCents,
+          category: category as Category,
+          condition: condition as Condition,
+          brand: brand.trim(),
+          size: size.trim(),
+          delivery: delivery as Delivery,
+          pickup_location: pickupLocation.trim() || null,
+        })
+        .select("id")
+        .single();
+      if (insertErr || !inserted) throw insertErr ?? new Error("Failed to create listing");
+
+      const listingId = inserted.id;
+
+      if (files.length > 0) {
+        const uploads = await Promise.all(
+          files.map(async ({ file }, i) => {
+            const ext = file.name.split(".").pop()?.toLowerCase() ?? "jpg";
+            const path = `${user.id}/${listingId}/${i}-${Date.now()}.${ext}`;
+            const { error: upErr } = await supabase.storage
+              .from("listing-images")
+              .upload(path, file, { contentType: file.type, upsert: false });
+            if (upErr) throw upErr;
+            const { data: pub } = supabase.storage
+              .from("listing-images")
+              .getPublicUrl(path);
+            return { listing_id: listingId, url: pub.publicUrl, sort_order: i };
+          }),
+        );
+        const { error: imgErr } = await supabase.from("listing_images").insert(uploads);
+        if (imgErr) throw imgErr;
+      }
+
+      setSubmitted(true);
+      router.push(`/listings/${listingId}`);
+      router.refresh();
+    } catch (err) {
+      setSubmitError(err instanceof Error ? err.message : "Could not publish the listing.");
+      setSubmitting(false);
+    }
   };
 
   if (submitted) {
@@ -143,9 +203,7 @@ export default function NewListingPage() {
           ✓
         </div>
         <h1 className="text-2xl font-bold mt-4">Listing published!</h1>
-        <p className="mt-2 text-[color:var(--muted-foreground)]">
-          Taking you to the home feed where you can see it…
-        </p>
+        <p className="mt-2 text-[color:var(--muted-foreground)]">Loading your listing…</p>
       </div>
     );
   }
@@ -156,6 +214,23 @@ export default function NewListingPage() {
       <p className="mt-1 text-[color:var(--muted-foreground)]">
         Most items get their first message within 24 hours.
       </p>
+
+      {authState === "guest" && (
+        <div className="mt-6 p-4 rounded-2xl border border-blue-300 bg-blue-50 text-sm">
+          <p className="font-semibold text-blue-900">You&apos;re not logged in</p>
+          <p className="mt-1 text-blue-800">
+            You can keep filling the form, but it&apos;ll save to your browser only. To list it publicly,{" "}
+            <Link href="/signup" className="underline font-semibold">
+              create an account
+            </Link>{" "}
+            or{" "}
+            <Link href="/login" className="underline font-semibold">
+              log in
+            </Link>
+            .
+          </p>
+        </div>
+      )}
 
       {payoutOk === false && (
         <div className="mt-6 p-4 rounded-2xl border border-yellow-300 bg-yellow-50 text-sm">
@@ -179,14 +254,14 @@ export default function NewListingPage() {
             First photo is the cover. Add up to 6. (Optional — a placeholder will be used.)
           </p>
           <div className="grid grid-cols-3 sm:grid-cols-4 gap-3">
-            {images.map((src, i) => (
+            {files.map((f, i) => (
               <div
-                key={src}
+                key={f.previewUrl}
                 className="relative aspect-square rounded-xl overflow-hidden bg-[color:var(--muted)] border"
               >
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
-                  src={src}
+                  src={f.previewUrl}
                   alt={`Upload ${i + 1}`}
                   className="absolute inset-0 w-full h-full object-cover"
                 />
@@ -205,7 +280,7 @@ export default function NewListingPage() {
                 )}
               </div>
             ))}
-            {images.length < 6 && (
+            {files.length < 6 && (
               <label className="aspect-square rounded-xl border-2 border-dashed grid place-items-center cursor-pointer hover:bg-[color:var(--muted)] text-[color:var(--muted-foreground)]">
                 <div className="text-center">
                   <div className="text-2xl">+</div>
@@ -223,11 +298,7 @@ export default function NewListingPage() {
           </div>
         </section>
 
-        <Field
-          label="Title"
-          hint="What is it?"
-          error={liveErrors.title}
-        >
+        <Field label="Title" hint="What is it?" error={liveErrors.title}>
           <input
             value={title}
             onChange={(e) => setTitle(e.target.value)}
@@ -291,9 +362,7 @@ export default function NewListingPage() {
           </Field>
           <Field label="Price (USD)" error={liveErrors.price}>
             <div className="relative">
-              <span className="absolute left-4 top-1/2 -translate-y-1/2 text-[color:var(--muted-foreground)]">
-                $
-              </span>
+              <span className="absolute left-4 top-1/2 -translate-y-1/2 text-[color:var(--muted-foreground)]">$</span>
               <input
                 type="number"
                 inputMode="decimal"
@@ -338,9 +407,7 @@ export default function NewListingPage() {
               </label>
             ))}
           </div>
-          {liveErrors.condition && (
-            <p className="text-xs text-red-600 mt-1">{liveErrors.condition}</p>
-          )}
+          {liveErrors.condition && <p className="text-xs text-red-600 mt-1">{liveErrors.condition}</p>}
         </section>
 
         <section className="space-y-2" data-error={liveErrors.delivery ? "true" : undefined}>
@@ -370,9 +437,7 @@ export default function NewListingPage() {
               </label>
             ))}
           </div>
-          {liveErrors.delivery && (
-            <p className="text-xs text-red-600 mt-1">{liveErrors.delivery}</p>
-          )}
+          {liveErrors.delivery && <p className="text-xs text-red-600 mt-1">{liveErrors.delivery}</p>}
           {(delivery === "pickup" || delivery === "both") && (
             <Field
               label="Pickup city / area"
@@ -413,6 +478,12 @@ export default function NewListingPage() {
           </div>
         )}
 
+        {submitError && (
+          <div className="p-3 rounded-lg bg-red-50 border border-red-200 text-sm text-red-700">
+            {submitError}
+          </div>
+        )}
+
         <div className="flex gap-3 pt-2">
           <button
             type="button"
@@ -423,9 +494,14 @@ export default function NewListingPage() {
           </button>
           <button
             type="submit"
-            className="flex-1 h-12 rounded-full bg-[color:var(--primary)] text-[color:var(--primary-foreground)] font-semibold hover:opacity-90"
+            disabled={submitting}
+            className="flex-1 h-12 rounded-full bg-[color:var(--primary)] text-[color:var(--primary-foreground)] font-semibold hover:opacity-90 disabled:opacity-70"
           >
-            {payoutOk ? "Publish listing" : "Set up payouts to publish"}
+            {submitting
+              ? "Publishing…"
+              : payoutOk
+                ? "Publish listing"
+                : "Set up payouts to publish"}
           </button>
         </div>
       </form>

@@ -2,8 +2,7 @@ import { Suspense } from "react";
 import { ListingCard } from "@/components/ListingCard";
 import { FilterBar } from "@/components/FilterBar";
 import { YourListings } from "@/components/YourListings";
-import { listings } from "@/lib/mock-data";
-import type { Listing } from "@/lib/types";
+import { getListings, type ListingFilters } from "@/lib/data";
 import Link from "next/link";
 
 type SearchParams = {
@@ -15,57 +14,21 @@ type SearchParams = {
   q?: string;
 };
 
-function applyFilters(items: Listing[], sp: SearchParams): Listing[] {
-  let out = items.slice();
-  if (sp.category && sp.category !== "all") {
-    out = out.filter((l) => l.category === sp.category);
-  }
-  if (sp.condition && sp.condition !== "all") {
-    out = out.filter((l) => l.condition === sp.condition);
-  }
-  if (sp.min) {
-    const min = Number(sp.min) * 100;
-    if (!Number.isNaN(min)) out = out.filter((l) => l.price >= min);
-  }
-  if (sp.max) {
-    const max = Number(sp.max) * 100;
-    if (!Number.isNaN(max)) out = out.filter((l) => l.price <= max);
-  }
-  if (sp.q) {
-    const q = sp.q.toLowerCase();
-    out = out.filter(
-      (l) =>
-        l.title.toLowerCase().includes(q) ||
-        l.brand.toLowerCase().includes(q) ||
-        l.description.toLowerCase().includes(q),
-    );
-  }
-  switch (sp.sort) {
-    case "price_asc":
-      out.sort((a, b) => a.price - b.price);
-      break;
-    case "price_desc":
-      out.sort((a, b) => b.price - a.price);
-      break;
-    case "popular":
-      out.sort((a, b) => b.likes - a.likes);
-      break;
-    default:
-      out.sort(
-        (a, b) =>
-          new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
-      );
-  }
-  return out;
-}
-
 export default async function Home({
   searchParams,
 }: {
   searchParams: Promise<SearchParams>;
 }) {
   const sp = await searchParams;
-  const filtered = applyFilters(listings, sp);
+  const filters: ListingFilters = {
+    category: sp.category,
+    condition: sp.condition,
+    minCents: sp.min ? Number(sp.min) * 100 : undefined,
+    maxCents: sp.max ? Number(sp.max) * 100 : undefined,
+    q: sp.q,
+    sort: (sp.sort as ListingFilters["sort"]) ?? "newest",
+  };
+  const filtered = await getListings(filters);
   const heroQuery = sp.q || sp.category;
 
   return (

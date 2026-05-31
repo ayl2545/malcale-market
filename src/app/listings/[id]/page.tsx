@@ -1,11 +1,6 @@
 import Image from "next/image";
 import Link from "next/link";
-import {
-  getListing,
-  getUser,
-  listings,
-  listingsBySeller,
-} from "@/lib/mock-data";
+import { getListingWithSeller, getProfileWithListings } from "@/lib/data";
 import {
   formatPrice,
   buyerTotal,
@@ -19,11 +14,7 @@ import { ListingCard } from "@/components/ListingCard";
 import { DeliveryBadge } from "@/components/DeliveryBadge";
 import { UserListingDetail } from "@/components/UserListingDetail";
 
-export const dynamicParams = true;
-
-export async function generateStaticParams() {
-  return listings.map((l) => ({ id: l.id }));
-}
+export const dynamic = "force-dynamic";
 
 export default async function ListingPage({
   params,
@@ -31,18 +22,15 @@ export default async function ListingPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const listing = getListing(id);
+  const result = await getListingWithSeller(id);
 
-  if (!listing) {
+  if (!result) {
     return <UserListingDetail id={id} />;
   }
 
-  const seller = getUser(listing.sellerId);
-  if (!seller) {
-    return <UserListingDetail id={id} />;
-  }
-
-  const more = listingsBySeller(seller.id).filter((l) => l.id !== listing.id);
+  const { listing, seller } = result;
+  const profile = await getProfileWithListings(seller.username);
+  const more = (profile?.listings ?? []).filter((l) => l.id !== listing.id);
 
   return (
     <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-6 sm:py-10">
@@ -125,7 +113,8 @@ export default async function ListingPage({
             <div className="flex-1 min-w-0">
               <p className="font-semibold truncate">{seller.displayName}</p>
               <p className="text-sm text-[color:var(--muted-foreground)] truncate">
-                @{seller.username} · {seller.location}
+                @{seller.username}
+                {seller.location ? ` · ${seller.location}` : ""}
               </p>
             </div>
             <div className="text-right shrink-0">
@@ -172,9 +161,7 @@ export default async function ListingPage({
 
       {more.length > 0 && (
         <section className="mt-12">
-          <h2 className="text-xl font-bold mb-4">
-            More from {seller.displayName}
-          </h2>
+          <h2 className="text-xl font-bold mb-4">More from {seller.displayName}</h2>
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4">
             {more.slice(0, 4).map((l) => (
               <ListingCard key={l.id} listing={l} />

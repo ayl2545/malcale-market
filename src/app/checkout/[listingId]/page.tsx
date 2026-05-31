@@ -1,10 +1,8 @@
 import { notFound } from "next/navigation";
-import { getListing, getUser, listings } from "@/lib/mock-data";
+import { getListingWithSeller } from "@/lib/data";
 import { CheckoutForm } from "@/components/CheckoutForm";
 
-export async function generateStaticParams() {
-  return listings.map((l) => ({ listingId: l.id }));
-}
+export const dynamic = "force-dynamic";
 
 export default async function CheckoutPage({
   params,
@@ -12,10 +10,9 @@ export default async function CheckoutPage({
   params: Promise<{ listingId: string }>;
 }) {
   const { listingId } = await params;
-  const listing = getListing(listingId);
-  if (!listing) notFound();
-  const seller = getUser(listing.sellerId);
-  if (!seller) notFound();
+  const result = await getListingWithSeller(listingId);
+  if (!result) notFound();
+  const { listing, seller } = result;
 
   return (
     <CheckoutForm
