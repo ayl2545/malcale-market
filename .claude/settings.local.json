@@ -54,7 +54,9 @@
       "Bash(vercel whoami *)",
       "Bash(vercel deploy *)",
       "Bash(vercel git *)",
-      "Bash(vercel project *)"
+      "Bash(vercel project *)",
+      "Bash(curl -sS 'https://yzhazaddvbfomjgzykia.supabase.co/rest/v1/profiles?select=username,display_name,created_at&order=created_at.desc&limit=5' -H 'apikey: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl6aGF6YWRkdmJmb21qZ3p5a2lhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODAyNDg4NDMsImV4cCI6MjA5NTgyNDg0M30.0uHuf39j2GGdnLxsc_FgFllqStw1ofm6kv4vzfuGMlM' -H 'Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl6aGF6YWRkdmJmb21qZ3p5a2lhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODAyNDg4NDMsImV4cCI6MjA5NTgyNDg0M30.0uHuf39j2GGdnLxsc_FgFllqStw1ofm6kv4vzfuGMlM')",
+      "Bash(curl -sS -o /dev/null -w 'HTTP %{http_code}\\\\nRedirect: %{redirect_url}\\\\n' 'https://yzhazaddvbfomjgzykia.supabase.co/auth/v1/authorize?provider=google&apikey=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl6aGF6YWRkdmJmb21qZ3p5a2lhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODAyNDg4NDMsImV4cCI6MjA5NTgyNDg0M30.0uHuf39j2GGdnLxsc_FgFllqStw1ofm6kv4vzfuGMlM')"
     ]
   }
 }
